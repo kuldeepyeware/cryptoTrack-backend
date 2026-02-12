@@ -7,7 +7,12 @@ from typing import List
 
 from app.core.database import get_db
 from app.core.auth import verify_clerk_token
-from app.schemas.asset import AssetCreate, AssetUpdate, AssetResponse
+from app.schemas.asset import (
+    AssetCreate,
+    AssetUpdate,
+    AssetResponse,
+    AssetResponseBase,
+)
 from app.services.coingecko import coingecko_client
 from app import crud
 
@@ -56,7 +61,7 @@ async def get_assets(
     return response
 
 
-@router.post("", response_model=AssetResponse, status_code=201)
+@router.post("", response_model=AssetResponseBase, status_code=201)
 async def create_asset(
     asset: AssetCreate,
     user_id: str = Depends(verify_clerk_token),
@@ -65,32 +70,10 @@ async def create_asset(
     """Create a new asset for the authenticated user."""
     logger.info(f"Creating asset {asset.ticker} for user {user_id[:8]}...")
     db_asset = await crud.create_asset(db, asset, user_id)
-
-    prices = await coingecko_client.get_prices([db_asset.symbol])
-    current_price = prices.get(db_asset.symbol, 0.0)
-    total_value = current_price * db_asset.quantity
-    invested_value = db_asset.buy_price * db_asset.quantity
-    profit_loss = total_value - invested_value
-    profit_loss_percent = (
-        (profit_loss / invested_value * 100) if invested_value > 0 else 0
-    )
-
-    return AssetResponse(
-        id=db_asset.id,
-        user_id=db_asset.user_id,
-        symbol=db_asset.symbol,
-        ticker=db_asset.ticker,
-        quantity=db_asset.quantity,
-        buy_price=db_asset.buy_price,
-        created_at=db_asset.created_at,
-        current_price=current_price,
-        total_value=total_value,
-        profit_loss=profit_loss,
-        profit_loss_percent=profit_loss_percent,
-    )
+    return db_asset
 
 
-@router.put("/{asset_id}", response_model=AssetResponse)
+@router.put("/{asset_id}", response_model=AssetResponseBase)
 async def update_asset(
     asset_id: int,
     asset_update: AssetUpdate,
@@ -103,28 +86,7 @@ async def update_asset(
     if not db_asset:
         raise HTTPException(status_code=404, detail="Asset not found")
 
-    prices = await coingecko_client.get_prices([db_asset.symbol])
-    current_price = prices.get(db_asset.symbol, 0.0)
-    total_value = current_price * db_asset.quantity
-    invested_value = db_asset.buy_price * db_asset.quantity
-    profit_loss = total_value - invested_value
-    profit_loss_percent = (
-        (profit_loss / invested_value * 100) if invested_value > 0 else 0
-    )
-
-    return AssetResponse(
-        id=db_asset.id,
-        user_id=db_asset.user_id,
-        symbol=db_asset.symbol,
-        ticker=db_asset.ticker,
-        quantity=db_asset.quantity,
-        buy_price=db_asset.buy_price,
-        created_at=db_asset.created_at,
-        current_price=current_price,
-        total_value=total_value,
-        profit_loss=profit_loss,
-        profit_loss_percent=profit_loss_percent,
-    )
+    return db_asset
 
 
 @router.delete("/{asset_id}", status_code=204)
@@ -140,3 +102,4 @@ async def delete_asset(
         raise HTTPException(status_code=404, detail="Asset not found")
 
     return None
+

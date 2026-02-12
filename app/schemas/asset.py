@@ -48,19 +48,25 @@ class AssetUpdate(BaseModel):
     buy_price: Optional[float] = Field(None, gt=0, le=100_000_000)
 
 
-class AssetResponse(AssetBase):
-    """Schema for asset response."""
+class AssetResponseBase(AssetBase):
+    """Schema for asset response without live prices."""
 
     id: int
     user_id: str
     created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AssetResponse(AssetResponseBase):
+    """Schema for asset response with live prices."""
+
     current_price: Optional[float] = None
     total_value: Optional[float] = None
     profit_loss: Optional[float] = None
     profit_loss_percent: Optional[float] = None
 
-    class Config:
-        from_attributes = True
 
 
 class AssetAllocation(BaseModel):
